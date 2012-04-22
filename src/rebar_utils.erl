@@ -44,7 +44,7 @@
          expand_code_path/0,
          deprecated/3, deprecated/4,
          expand_env_variable/3,
-         vcs_vsn/2,
+         vcs_vsn/3,
          get_deprecated_global/3,
          get_deprecated_list/4, get_deprecated_list/5,
          get_deprecated_local/4, get_deprecated_local/5,
@@ -195,14 +195,17 @@ expand_env_variable(InStr, VarName, RawVarValue) ->
             re:replace(InStr, RegEx, [VarValue, "\\2"], ReOpts)
     end.
 
-vcs_vsn(Vcs, Dir) ->
+vcs_vsn(Config, Vcs, Dir) ->
     Key = {Vcs, Dir},
-    try ets:lookup_element(rebar_vsn_cache, Key, 2)
-    catch
-        error:badarg ->
+    {ok, Cache} = rebar_config:get_xconf(Config, vsn_cache),
+    case dict:find(Key, Cache) of
+        error ->
             VsnString = vcs_vsn_1(Vcs, Dir),
-            ets:insert(rebar_vsn_cache, {Key, VsnString}),
-            VsnString
+            Cache1 = dict:store(Key, VsnString, Cache),
+            Config1 = rebar_config:set_xconf(Config, vsn_cache, Cache1),
+            {Config1, VsnString};
+        {ok, VsnString} ->
+            {Config, VsnString}
     end.
 
 vcs_vsn_1(Vcs, Dir) ->
